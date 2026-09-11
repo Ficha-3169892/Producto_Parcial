@@ -13,3 +13,9 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Node.js
+node_modules/
+coverage/
+npm-debug.log*
+
