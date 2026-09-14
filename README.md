@@ -112,12 +112,46 @@ El reporte detallado en HTML se genera en la carpeta `coverage/index.html`.
 
 ## 6. Documentación Metodológica y Scrum
 
-Para consultar el soporte documental completo del entregable de la Semana 8:
-- [Selección de Casos Candidatos (Actividad 3.4)](docs/Pruebas/CasosPrueba.md)
-- [Matriz de Trazabilidad Integral](docs/Pruebas/MatrizTrazabilidad.md)
-- [Plan de Pruebas de Software](docs/Pruebas/PlanPruebas.md)
-- [Registro de Defectos](docs/Pruebas/Defectos.md)
-- [Sprint Goal](docs/Scrum/SprintGoal.md)
-- [Sprint Backlog Técnico](docs/Scrum/SprintBacklog.md)
-- [Definition of Done Refinada](docs/Scrum/DefinitionOfDone.md)
-- [Sprint Retrospective](docs/Scrum/Retrospective.md)
+
+
+---
+
+## 7. Incremento Semana 8 — Servicios Web, Caché y Resiliencia (Android CTMA)
+
+### Arquitectura Offline-First y Flujo Canónico de Datos
+La aplicación implementa el patrón **Offline-First** recomendado por la guía de arquitectura Android:
+
+$$\text{API REST} \longrightarrow \text{ActividadDto} \xrightarrow{\text{Mapper}} \text{ActividadEntity} \longrightarrow \text{Room DB} \xrightarrow{\text{Flow}} \text{UI (Compose)}$$
+
+1. **Regla de fuente única**: Room es la única fuente de verdad observada por la UI a través de `Flow<List<ActividadFormativa>>`.
+2. **Resiliencia de Caché**: Las respuestas HTTP fallidas (Timeout, 401, 5xx, Sin conexión) **nunca reemplazan ni vacían los datos locales** previamente almacenados en Room.
+3. **Manejo Seguro de Autenticación**: El encabezado `Authorization: Bearer <token>` se inyecta centralizadamente mediante un interceptor en `NetworkModule` a través del contrato `TokenProvider`. No hay literales de token ni secretos hardcodeados en el código o en Git.
+4. **Estados Independientes en UI**:
+   - `ListadoUiState`: Representa el contenido local (`Cargando`, `Contenido`, `Vacio`, `Error`).
+   - `OperacionUiState`: Representa la sincronización remota (`Inactiva`, `EnCurso`, `Exitosa`, `Fallida`).
+
+### Contrato API REST (JSON)
+- **Endpoint**: `GET /v1/actividades`
+- **Respuesta 200 OK**:
+```json
+[
+  {
+    "id": 1,
+    "titulo": "Revisión de Laboratorio CTMA",
+    "descripcion": "Verificación de calibración de multímetros.",
+    "fechaLimite": "2026-09-30",
+    "estado": "PENDIENTE"
+  }
+]
+```
+
+### Casos de Aceptación Obligatorios (CA-01 a CA-08)
+- **CA-01 (200 OK)**: Los datos de la API se parsean como `ActividadDto`, se mapean a `ActividadEntity` y se guardan atómicamente en Room.
+- **CA-02 (200 OK Vacío)**: Una lista vacía válida no borra la caché previa en Room.
+- **CA-03 (Timeout)**: Al agotarse el tiempo de espera (15s), Room conserva los datos y se notifica el fallo en `OperacionUiState.Fallida`.
+- **CA-04 (Sin Red)**: `IOException` capturada y traducida a un estado recuperable con opción "Reintentar".
+- **CA-05 (401 Unauthorized)**: Notifica "Sesión vencida" sin revelar tokens en logs ni en la interfaz.
+- **CA-06 (500 Error)**: Clasificado como error de servidor; Room mantiene los datos válidos.
+- **CA-07 (Doble Refresh Rápido)**: Controlado en `ActividadViewModel` mediante Jobs cancelables para evitar duplicados.
+- **CA-08 (Cancelación de Corrutinas)**: `CancellationException` se relanza adecuadamente sin convertir la cancelación en un error visible.
+
