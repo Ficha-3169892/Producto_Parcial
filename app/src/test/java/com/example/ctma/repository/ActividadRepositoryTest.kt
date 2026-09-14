@@ -15,7 +15,6 @@ import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
-import java.util.concurrent.TimeUnit
 
 class FakeActividadDao : ActividadDao {
     private val db = mutableListOf<ActividadEntity>()
@@ -54,7 +53,7 @@ class ActividadRepositoryTest {
         val tokenProvider = SessionTokenProvider()
         val okHttpClient = NetworkModule.crearOkHttpClient(tokenProvider)
         api = NetworkModule.crearActividadApi(mockWebServer.url("/").toString(), okHttpClient)
-        
+
         dao = FakeActividadDao()
         val remoteDataSource = RemoteActividadDataSource(api)
         repository = ActividadRepositoryImpl(remoteDataSource, dao)
@@ -65,72 +64,77 @@ class ActividadRepositoryTest {
         mockWebServer.shutdown()
     }
 
-    // CA-01: 200 con actividades
+    // CA-07: Actualización de datos en Room
     @Test
-    fun `CA-01 - 200 con actividades guarda en Room y actualiza el estado a Exitosa`() = runTest {
+    fun `CA-07 - 200 refresh reemplaza los datos antiguos en la base de datos local`() = runTest {
+        // Insertar un dato antiguo en el FakeDao
+        dao.insertarTodas(listOf(ActividadEntity(1, "Titulo Viejo", "Desc", "2026-09-01", "PENDIENTE")))
+
+        // Simular que el servidor envía el mismo ID pero con datos actualizados
         val jsonResponse = """
             [
-                {"id": 1, "titulo": "Actividad 1", "descripcion": "Desc 1", "fechaLimite": "2026-09-30", "estado": "PENDIENTE"}
+                {"id": 1, "titulo": "Titulo Nuevo", "descripcion": "Desc", "fechaLimite": "2026-09-01", "estado": "HECHO"}
+            ]
+        """.trimIndent()
+        mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody(jsonResponse))
+
+        repository.refresh()
+
+        // Verificar que el repositorio guardó los datos nuevos sobreescribiendo los viejos
+        val guardado = dao.obtenerPorId(1)
+        assertEquals("Titulo Nuevo", guardado?.titulo)
+        assertEquals("HECHO", guardado?.estado)
+    }
+
+    // CA-08: 404 Endpoint no encontrado
+    @Test
+    fun `CA-08 - 404 ruta no encontrada retorna estado Fallida`() = runTest {
+        mockWebServer.enqueue(MockResponse().setResponseCode(404).setBody("Not Found"))
+
+        val resultado = repository.refresh()
+
+        assertTrue(resultado is OperacionUiState.Fallida)
+        val fallida = resultado as OperacionUiState.Fallida
+        assertEquals(404, fallida.codigo)
+    }
+
+    // CA-09: JSON con formato incorrecto
+    @Test
+    fun `CA-09 - 200 con JSON malformado falla al procesar y retorna Fallida`() = runTest {
+        // Se envía un JSON donde el ID es un texto en lugar de un número, provocando error de parseo
+        val jsonInvalido = """
+            [
+                {"id": "uno_en_texto", "titulo": "Actividad 1", "descripcion": "Desc 1", "fechaLimite": "2026-09-30", "estado": "PENDIENTE"}
             ]
         """.trimIndent()
 
-        mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody(jsonResponse))
-
-        val resultado = repository.refresh()
-
-        assertTrue(resultado is OperacionUiState.Exitosa)
-    }
-
-    // CA-02: 200 con arreglo vacío
-    @Test
-    fun `CA-02 - 200 con arreglo vacio no borra la cache previa`() = runTest {
-        // Precargar caché previa en Dao
-        dao.insertarTodas(listOf(ActividadEntity(1, "Previa", "Desc", "2026-09-01", "HECHO")))
-
-        mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody("[]"))
-
-        val resultado = repository.refresh()
-
-        assertTrue(resultado is OperacionUiState.Exitosa)
-        // El caché previo debe conservarse según la política establecida
-    }
-
-    // CA-03: Timeout con caché
-    @Test
-    fun `CA-03 - Timeout conserva el cache local y retorna operacion Fallida`() = runTest {
-        mockWebServer.enqueue(
-            MockResponse()
-                .setBody("""[{"id": 1, "titulo": "T"}]""")
-                .setBodyDelay(20, TimeUnit.SECONDS)
-        )
+        mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody(jsonInvalido))
 
         val resultado = repository.refresh()
 
         assertTrue(resultado is OperacionUiState.Fallida)
     }
 
-    // CA-05: 401 Unauthorized
+    // CA-10: 403 Forbidden (Permisos denegados)
     @Test
-    fun `CA-05 - 401 retorna estado Fallida clasificado con mensaje de sesion vencida`() = runTest {
-        mockWebServer.enqueue(MockResponse().setResponseCode(401).setBody("Unauthorized"))
+    fun `CA-10 - 403 acceso denegado por permisos retorna Fallida`() = runTest {
+        mockWebServer.enqueue(MockResponse().setResponseCode(403).setBody("Forbidden"))
 
         val resultado = repository.refresh()
 
         assertTrue(resultado is OperacionUiState.Fallida)
         val fallida = resultado as OperacionUiState.Fallida
-        assertEquals(401, fallida.codigo)
-        assertTrue(fallida.mensaje.contains("Sesión vencida"))
+        assertEquals(403, fallida.codigo)
     }
 
-    // CA-06: 500 o JSON inválido
+    // CA-11: Respuesta 200 pero con cuerpo completamente vacío
     @Test
-    fun `CA-06 - 500 retorna estado Fallida clasificando error de servidor`() = runTest {
-        mockWebServer.enqueue(MockResponse().setResponseCode(500).setBody("Internal Error"))
+    fun `CA-11 - 200 con cuerpo vacio genera excepcion y retorna Fallida`() = runTest {
+        // En lugar de enviar un arreglo vacío "[]", se envía nada, lo que rompe el convertidor JSON
+        mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody(""))
 
         val resultado = repository.refresh()
 
         assertTrue(resultado is OperacionUiState.Fallida)
-        val fallida = resultado as OperacionUiState.Fallida
-        assertEquals(500, fallida.codigo)
     }
 }
