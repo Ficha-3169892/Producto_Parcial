@@ -155,3 +155,13 @@ $$\text{API REST} \longrightarrow \text{ActividadDto} \xrightarrow{\text{Mapper}
 - **CA-07 (Doble Refresh Rápido)**: Controlado en `ActividadViewModel` mediante Jobs cancelables para evitar duplicados.
 - **CA-08 (Cancelación de Corrutinas)**: `CancellationException` se relanza adecuadamente sin convertir la cancelación en un error visible.
 
+### Mapeo con Historias de Usuario (HU) de la Semana 8
+
+| ID Historia | Historia de Usuario | Criterio de Aceptación / Caso de Aceptación | Test Automatizado que lo Valida | Estado |
+| :--- | :--- | :--- | :--- | :---: |
+| **HU-07** | **Consulta de Actividades Offline**<br>Como aprendiz, quiero consultar mis actividades almacenadas previamente aunque no tenga conexión a internet. | **CA-04 / CA-03**: Al ocurrir falla de red o timeout, la app muestra los datos locales almacenados en Room sin borrar la lista y muestra la acción Reintentar. | `CA-03 - Timeout conserva el cache local y retorna operacion Fallida` | **PASÓ** |
+| **HU-08** | **Sincronización Automática con API REST**<br>Como aprendiz, quiero que mis actividades se actualicen automáticamente con el servidor cuando haya conexión. | **CA-01**: Al recibir una respuesta 200 OK de la API `/v1/actividades`, la app inserta los datos en Room y actualiza la lista mediante `Flow`. | `CA-01 - 200 con actividades guarda en Room y actualiza el estado a Exitosa` | **PASÓ** |
+| **HU-09** | **Protección de Sesión y Credenciales**<br>Como sistema, exijo autenticación mediante token para consumir la API sin exponer credenciales en la interfaz ni en logs. | **CA-05**: Ante un error 401 Unauthorized, la app notifica sesión vencida e inyecta el token en la cabecera HTTP sin imprimirlo en Logcat. | `CA-05 - 401 retorna estado Fallida clasificado con mensaje de sesion vencida` | **PASÓ** |
+| **HU-10** | **Resiliencia ante Errores de Servidor**<br>Como usuario, quiero recibir mensajes accionables claros cuando el servidor falle, sin perder mis datos previos. | **CA-02 / CA-06**: Ante respuestas 500, JSON inválido o arreglos vacíos de la API, la app clasifica el error y preserva la caché previa intacta. | `CA-02 - 200 con arreglo vacio no borra la cache previa`<br>`CA-06 - 500 retorna estado Fallida clasificando error de servidor` | **PASÓ** |
+
+
