@@ -5,15 +5,21 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+ksp {
+    arg("ksp.use.ksp2", "false")
+}
+
 android {
     namespace = "com.example.ctma"
 
-    compileSdk = 35
+    compileSdk {
+        version = release(37)
+    }
 
     defaultConfig {
         applicationId = "com.example.prestamolabctmaa"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 37
         versionCode = 1
         versionName = "1.0"
 
@@ -29,8 +35,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     buildFeatures {
