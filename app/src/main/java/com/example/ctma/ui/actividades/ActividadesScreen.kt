@@ -15,6 +15,7 @@ import com.example.ctma.repository.ListadoUiState
 import com.example.ctma.repository.OperacionUiState
 import com.example.ctma.viewmodel.ActividadViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ActividadesScreen(
     viewModel: ActividadViewModel,
@@ -25,7 +26,6 @@ fun ActividadesScreen(
 
     Scaffold(
         topBar = {
-            OptIn(ExperimentalMaterial3Api::class)
             TopAppBar(
                 title = { Text("Actividades Formativas") },
                 actions = {
