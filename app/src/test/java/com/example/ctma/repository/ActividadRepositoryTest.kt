@@ -17,19 +17,31 @@ import org.junit.Before
 import org.junit.Test
 import java.util.concurrent.TimeUnit
 
-class FakeActividadDao : ActividadDao {
-    private val db = mutableListOf<ActividadEntity>()
-    private val flow = MutableStateFlow<List<ActividadEntity>>(emptyList())
 
-    override fun observarTodas(): Flow<List<ActividadEntity>> = flow
+class FakeActividadDao : ActividadDao {
+
+    private val db = mutableListOf<ActividadEntity>()
+
+    private val flow =
+        MutableStateFlow<List<ActividadEntity>>(emptyList())
+
+    override fun observarTodas(): Flow<List<ActividadEntity>> {
+        return flow
+    }
 
     override suspend fun obtenerPorId(id: Int): ActividadEntity? {
         return db.find { it.id == id }
     }
 
-    override suspend fun insertarTodas(actividades: List<ActividadEntity>) {
-        db.removeAll { existing -> actividades.any { it.id == existing.id } }
+    override suspend fun insertarTodas(
+        actividades: List<ActividadEntity>
+    ) {
+        db.removeAll { existente ->
+            actividades.any { it.id == existente.id }
+        }
+
         db.addAll(actividades)
+
         flow.value = db.toList()
     }
 
@@ -39,6 +51,7 @@ class FakeActividadDao : ActividadDao {
     }
 }
 
+
 class ActividadRepositoryTest {
 
     private lateinit var mockWebServer: MockWebServer
@@ -46,91 +59,209 @@ class ActividadRepositoryTest {
     private lateinit var dao: FakeActividadDao
     private lateinit var repository: ActividadRepositoryImpl
 
+
     @Before
     fun setup() {
+
         mockWebServer = MockWebServer()
         mockWebServer.start()
 
         val tokenProvider = SessionTokenProvider()
-        val okHttpClient = NetworkModule.crearOkHttpClient(tokenProvider)
-        api = NetworkModule.crearActividadApi(mockWebServer.url("/").toString(), okHttpClient)
-        
+
+        val okHttpClient =
+            NetworkModule.crearOkHttpClient(tokenProvider)
+
+        api = NetworkModule.crearActividadApi(
+            mockWebServer.url("/").toString(),
+            okHttpClient
+        )
+
         dao = FakeActividadDao()
-        val remoteDataSource = RemoteActividadDataSource(api)
-        repository = ActividadRepositoryImpl(remoteDataSource, dao)
+
+        val remoteDataSource =
+            RemoteActividadDataSource(api)
+
+        repository =
+            ActividadRepositoryImpl(
+                remoteDataSource,
+                dao
+            )
     }
+
 
     @After
     fun tearDown() {
         mockWebServer.shutdown()
     }
 
-    // CA-01: 200 con actividades
+
+    // ============================================================
+    // HU-01 - Actualización de información
+    // CA-01 - Cuando existen actividades disponibles en el servidor,
+    // el sistema debe actualizar la información correctamente.
+    // ============================================================
+
     @Test
-    fun `CA-01 - 200 con actividades guarda en Room y actualiza el estado a Exitosa`() = runTest {
-        val jsonResponse = """
-            [
-                {"id": 1, "titulo": "Actividad 1", "descripcion": "Desc 1", "fechaLimite": "2026-09-30", "estado": "PENDIENTE"}
-            ]
-        """.trimIndent()
+    fun `HU-01 - CA-01 - actualiza las actividades disponibles`() =
+        runTest {
 
-        mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody(jsonResponse))
+            val respuestaServidor = """
+                [
+                    {
+                        "id": 10,
+                        "titulo": "Diseño de interfaz",
+                        "descripcion": "Crear una interfaz para la aplicación",
+                        "fechaLimite": "2026-10-15",
+                        "estado": "PENDIENTE"
+                    },
+                    {
+                        "id": 11,
+                        "titulo": "Pruebas del sistema",
+                        "descripcion": "Realizar pruebas funcionales",
+                        "fechaLimite": "2026-10-20",
+                        "estado": "EN_PROCESO"
+                    }
+                ]
+            """.trimIndent()
 
-        val resultado = repository.refresh()
+            mockWebServer.enqueue(
+                MockResponse()
+                    .setResponseCode(200)
+                    .setBody(respuestaServidor)
+            )
 
-        assertTrue(resultado is OperacionUiState.Exitosa)
-    }
+            val resultado = repository.refresh()
 
-    // CA-02: 200 con arreglo vacío
+            assertTrue(
+                resultado is OperacionUiState.Exitosa
+            )
+        }
+
+
+    // ============================================================
+    // HU-02 - Consulta sin resultados
+    // CA-02 - Cuando el servidor no tiene actividades para mostrar,
+    // la aplicación debe completar la operación correctamente.
+    // ============================================================
+
     @Test
-    fun `CA-02 - 200 con arreglo vacio no borra la cache previa`() = runTest {
-        // Precargar caché previa en Dao
-        dao.insertarTodas(listOf(ActividadEntity(1, "Previa", "Desc", "2026-09-01", "HECHO")))
+    fun `HU-02 - CA-02 - procesa correctamente una consulta sin resultados`() =
+        runTest {
 
-        mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody("[]"))
+            mockWebServer.enqueue(
+                MockResponse()
+                    .setResponseCode(200)
+                    .setBody("[]")
+            )
 
-        val resultado = repository.refresh()
+            val resultado = repository.refresh()
 
-        assertTrue(resultado is OperacionUiState.Exitosa)
-        // El caché previo debe conservarse según la política establecida
-    }
+            assertTrue(
+                resultado is OperacionUiState.Exitosa
+            )
+        }
 
-    // CA-03: Timeout con caché
+
+    // ============================================================
+    // HU-03 - Disponibilidad de la información local
+    // CA-03 - Si la conexión con el servidor presenta una demora,
+    // el sistema debe informar que la actualización no fue exitosa.
+    // ============================================================
+
     @Test
-    fun `CA-03 - Timeout conserva el cache local y retorna operacion Fallida`() = runTest {
-        mockWebServer.enqueue(
-            MockResponse()
-                .setBody("""[{"id": 1, "titulo": "T"}]""")
-                .setBodyDelay(20, TimeUnit.SECONDS)
-        )
+    fun `HU-03 - CA-03 - controla una demora en la respuesta del servidor`() =
+        runTest {
 
-        val resultado = repository.refresh()
+            mockWebServer.enqueue(
+                MockResponse()
+                    .setBody(
+                        """
+                        [
+                            {
+                                "id": 20,
+                                "titulo": "Actividad de prueba"
+                            }
+                        ]
+                        """.trimIndent()
+                    )
+                    .setBodyDelay(
+                        20,
+                        TimeUnit.SECONDS
+                    )
+            )
 
-        assertTrue(resultado is OperacionUiState.Fallida)
-    }
+            val resultado = repository.refresh()
 
-    // CA-05: 401 Unauthorized
+            assertTrue(
+                resultado is OperacionUiState.Fallida
+            )
+        }
+
+
+    // ============================================================
+    // HU-04 - Validación de acceso
+    // CA-04 - Si el servidor determina que la sesión ya no es válida,
+    // el sistema debe identificar correctamente el problema.
+    // ============================================================
+
     @Test
-    fun `CA-05 - 401 retorna estado Fallida clasificado con mensaje de sesion vencida`() = runTest {
-        mockWebServer.enqueue(MockResponse().setResponseCode(401).setBody("Unauthorized"))
+    fun `HU-04 - CA-04 - identifica una sesion no valida`() =
+        runTest {
 
-        val resultado = repository.refresh()
+            mockWebServer.enqueue(
+                MockResponse()
+                    .setResponseCode(401)
+                    .setBody("Unauthorized")
+            )
 
-        assertTrue(resultado is OperacionUiState.Fallida)
-        val fallida = resultado as OperacionUiState.Fallida
-        assertEquals(401, fallida.codigo)
-        assertTrue(fallida.mensaje.contains("Sesión vencida"))
-    }
+            val resultado = repository.refresh()
 
-    // CA-06: 500 o JSON inválido
+            assertTrue(
+                resultado is OperacionUiState.Fallida
+            )
+
+            val error =
+                resultado as OperacionUiState.Fallida
+
+            assertEquals(
+                401,
+                error.codigo
+            )
+
+            assertTrue(
+                error.mensaje.contains("Sesión vencida")
+            )
+        }
+
+
+    // ============================================================
+    // HU-05 - Disponibilidad del servicio
+    // CA-05 - Si el servicio presenta un error interno,
+    // la aplicación debe identificar el código recibido.
+    // ============================================================
+
     @Test
-    fun `CA-06 - 500 retorna estado Fallida clasificando error de servidor`() = runTest {
-        mockWebServer.enqueue(MockResponse().setResponseCode(500).setBody("Internal Error"))
+    fun `HU-05 - CA-05 - identifica un error interno del servicio`() =
+        runTest {
 
-        val resultado = repository.refresh()
+            mockWebServer.enqueue(
+                MockResponse()
+                    .setResponseCode(500)
+                    .setBody("Service temporarily unavailable")
+            )
 
-        assertTrue(resultado is OperacionUiState.Fallida)
-        val fallida = resultado as OperacionUiState.Fallida
-        assertEquals(500, fallida.codigo)
-    }
+            val resultado = repository.refresh()
+
+            assertTrue(
+                resultado is OperacionUiState.Fallida
+            )
+
+            val error =
+                resultado as OperacionUiState.Fallida
+
+            assertEquals(
+                500,
+                error.codigo
+            )
+        }
 }
