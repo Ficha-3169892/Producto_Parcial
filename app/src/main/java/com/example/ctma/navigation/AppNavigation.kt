@@ -22,6 +22,7 @@ import com.example.ctma.ui.catalogo.CatalogoScreen
 import com.example.ctma.ui.catalogo.solicitud.SolicitudScreen
 import com.example.ctma.ui.catalogo.solicitudes.SolicitudDetalleScreen
 import com.example.ctma.ui.catalogo.solicitudes.SolicitudesScreen
+import com.example.ctma.ui.catalogo.solicitudes.DevolucionScreen
 import com.example.ctma.viewmodel.PrestamoViewModel
 
 @Composable
@@ -98,6 +99,11 @@ fun AppNavigation(
 
                     solicitudSeleccionadaId = solicitudId
                     pantallaActual = 3
+                },
+
+                onRegistrarDevolucion = { solicitudId ->
+                    solicitudSeleccionadaId = solicitudId
+                    pantallaActual = 4
                 },
 
                 onVolverCatalogo = {
@@ -203,6 +209,36 @@ fun AppNavigation(
 
             } else {
 
+                pantallaActual = 1
+            }
+        }
+
+        // ==============================
+        // REGISTRAR DEVOLUCIÓN
+        // ==============================
+
+        4 -> {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val solicitudId = solicitudSeleccionadaId
+            if (solicitudId != null) {
+                val solicitud = viewModel.obtenerSolicitud(solicitudId)
+                if (solicitud != null) {
+                    DevolucionScreen(
+                        solicitud = solicitud,
+                        onConfirmarDevolucion = { uri, lat, lon ->
+                            viewModel.registrarDevolucion(context, solicitudId, uri, lat, lon)
+                            solicitudSeleccionadaId = null
+                            pantallaActual = 1
+                        },
+                        onVolver = {
+                            solicitudSeleccionadaId = null
+                            pantallaActual = 1
+                        }
+                    )
+                } else {
+                    pantallaActual = 1
+                }
+            } else {
                 pantallaActual = 1
             }
         }
