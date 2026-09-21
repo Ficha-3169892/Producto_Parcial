@@ -150,6 +150,34 @@ class InMemoryPrestamoRepository : PrestamoRepository {
         return Result.success(Unit)
     }
 
+    override fun registrarDevolucion(
+        id: Int,
+        evidenciaUri: String?,
+        latitud: Double?,
+        longitud: Double?
+    ): Result<Unit> {
+        val indice = solicitudes.indexOfFirst { it.id == id }
+        if (indice == -1) {
+            return Result.failure(IllegalArgumentException("La solicitud no existe"))
+        }
+
+        val solicitud = solicitudes[indice]
+        solicitudes[indice] = solicitud.copy(
+            estado = EstadoSolicitud.DEVUELTA,
+            evidenciaUri = evidenciaUri,
+            latitud = latitud,
+            longitud = longitud,
+            estadoEvidencia = "SINCRONIZADA"
+        )
+
+        actualizarEstadoEquipo(
+            equipoId = solicitud.equipoId,
+            nuevoEstado = EstadoEquipo.DISPONIBLE
+        )
+
+        return Result.success(Unit)
+    }
+
     private fun actualizarEstadoEquipo(
         equipoId: Int,
         nuevoEstado: EstadoEquipo
