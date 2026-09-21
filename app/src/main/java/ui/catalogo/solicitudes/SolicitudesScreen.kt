@@ -23,6 +23,7 @@ fun SolicitudesScreen(
     solicitudes: List<SolicitudPrestamo>,
     onCancelarSolicitud: (Int) -> Unit,
     onSolicitudSeleccionada: (Int) -> Unit,
+    onRegistrarDevolucion: (Int) -> Unit,
     onVolverCatalogo: () -> Unit
 ) {
 
@@ -127,6 +128,15 @@ fun SolicitudesScreen(
                                         modifier = Modifier.weight(1f)
                                     ) {
                                         Text("Cancelar")
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            onRegistrarDevolucion(solicitud.id)
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("Devolver")
                                     }
                                 }
                             }

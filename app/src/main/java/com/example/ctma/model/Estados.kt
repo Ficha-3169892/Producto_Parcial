@@ -10,5 +10,6 @@ enum class EstadoSolicitud {
     SOLICITADA,
     APROBADA,
     RECHAZADA,
-    CANCELADA
+    CANCELADA,
+    DEVUELTA
 }

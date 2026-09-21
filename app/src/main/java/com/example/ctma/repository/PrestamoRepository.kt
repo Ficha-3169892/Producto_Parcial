@@ -16,4 +16,6 @@ interface PrestamoRepository {
     fun crearSolicitud(solicitud: SolicitudPrestamo): Result<Unit>
 
     fun cancelarSolicitud(id: Int): Result<Unit>
+
+    fun registrarDevolucion(id: Int, evidenciaUri: String?, latitud: Double?, longitud: Double?): Result<Unit>
 }

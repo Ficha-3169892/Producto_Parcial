@@ -28,7 +28,9 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize()
                 ) {
 
-                    val prestamoViewModel: PrestamoViewModel = viewModel()
+                    val prestamoViewModel: PrestamoViewModel = viewModel(
+                        factory = androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.getInstance(application)
+                    )
 
                     AppNavigation(
                         viewModel = prestamoViewModel
