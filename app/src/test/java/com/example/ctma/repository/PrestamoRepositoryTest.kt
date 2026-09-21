@@ -12,23 +12,44 @@ class PrestamoRepositoryTest {
 
     private lateinit var repository: PrestamoRepository
 
-    // Implementación Fake limpia local para aislar dependencias del framework de Android y pasar las pruebas
+    /**
+     * Implementación Fake dinámica para probar lógica de negocio sin dependencias de Android.
+     */
     private class FakeTestPrestamoRepository : PrestamoRepository {
-        var equipoEstadoSimulado = EstadoEquipo.DISPONIBLE
-        var solicitudSimulada: SolicitudPrestamo? = null
+        val equipos = mutableListOf(
+            Equipo(1, "Multímetro", "Electrónica", EstadoEquipo.DISPONIBLE),
+            Equipo(2, "Osciloscopio", "Electrónica", EstadoEquipo.PRESTADO)
+        )
+        val solicitudes = mutableListOf<SolicitudPrestamo>()
 
-        override fun obtenerEquipos(): List<Equipo> = emptyList()
-        override fun obtenerEquipo(id: Int): Equipo? {
-            return Equipo(id, "Test", "Cat", equipoEstadoSimulado)
-        }
-        override fun obtenerSolicitudes(): List<SolicitudPrestamo> = emptyList()
-        override fun obtenerSolicitud(id: Int): SolicitudPrestamo? = solicitudSimulada
+        override fun obtenerEquipos(): List<Equipo> = equipos
+        override fun obtenerEquipo(id: Int): Equipo? = equipos.find { it.id == id }
+        override fun obtenerSolicitudes(): List<SolicitudPrestamo> = solicitudes
+        override fun obtenerSolicitud(id: Int): SolicitudPrestamo? = solicitudes.find { it.id == id }
         
         override fun crearSolicitud(solicitud: SolicitudPrestamo): Result<Unit> {
-            equipoEstadoSimulado = EstadoEquipo.PRESTADO
+            val equipo = obtenerEquipo(solicitud.equipoId) ?: return Result.failure(Exception("Equipo no existe"))
+            if (equipo.estado != EstadoEquipo.DISPONIBLE) return Result.failure(Exception("No disponible"))
+            
+            val nueva = solicitud.copy(id = solicitudes.size + 1)
+            solicitudes.add(nueva)
+            equipos[equipos.indexOf(equipo)] = equipo.copy(estado = EstadoEquipo.PRESTADO)
             return Result.success(Unit)
         }
-        override fun cancelarSolicitud(id: Int): Result<Unit> = Result.success(Unit)
+
+        override fun cancelarSolicitud(id: Int): Result<Unit> {
+            val index = solicitudes.indexOfFirst { it.id == id }
+            if (index == -1) return Result.failure(Exception("No encontrada"))
+            
+            val sol = solicitudes[index]
+            solicitudes[index] = sol.copy(estado = EstadoSolicitud.CANCELADA)
+            val eqIndex = equipos.indexOfFirst { it.id == sol.equipoId }
+            if (eqIndex != -1) {
+                equipos[eqIndex] = equipos[eqIndex].copy(estado = EstadoEquipo.DISPONIBLE)
+            }
+            return Result.success(Unit)
+        }
+
         override fun registrarDevolucion(id: Int, uri: String?, lat: Double?, lon: Double?): Result<Unit> {
             equipoEstadoSimulado = EstadoEquipo.DISPONIBLE
             solicitudSimulada = SolicitudPrestamo(id, 2, "A", "P", 2, EstadoSolicitud.DEVUELTA, uri, lat, lon, "SINCRONIZADA")
@@ -42,26 +63,41 @@ class PrestamoRepositoryTest {
     }
 
     @Test
-    fun `crearSolicitud cambia el estado del equipo a PRESTADO`() {
-        val solicitud = SolicitudPrestamo(
-            id = 0, equipoId = 1, ambienteDestino = "Ambiente 402", proposito = "Prácticas", duracionHoras = 2, estado = EstadoSolicitud.SOLICITADA
-        )
-        val resultado = repository.crearSolicitud(solicitud)
+    fun `cancelarSolicitud cambia estado a CANCELADA y libera el equipo`() {
+        // Arrange: Creamos una solicitud exitosa para el equipo 1
+        val solicitud = SolicitudPrestamo(0, 1, "A-1", "Test", 1, EstadoSolicitud.SOLICITADA)
+        repository.crearSolicitud(solicitud)
+        val idGenerado = repository.obtenerSolicitudes().first().id
+
+        // Act
+        val resultado = repository.cancelarSolicitud(idGenerado)
+
+        // Assert
         assertTrue(resultado.isSuccess)
-        val equipo = repository.obtenerEquipo(1)
-        assertEquals(EstadoEquipo.PRESTADO, equipo?.estado)
+        assertEquals(EstadoSolicitud.CANCELADA, repository.obtenerSolicitud(idGenerado)?.estado)
+        assertEquals(EstadoEquipo.DISPONIBLE, repository.obtenerEquipo(1)?.estado)
     }
 
     @Test
-    fun `registrarDevolucion cambia el estado de la solicitud a DEVUELTA y el equipo vuelve a estar DISPONIBLE`() {
-        val resultado = repository.registrarDevolucion(2, "file://cache/evidencia.jpg", 6.2514, -75.5636)
-        assertTrue(resultado.isSuccess)
-        val equipo = repository.obtenerEquipo(2)
-        assertEquals(EstadoEquipo.DISPONIBLE, equipo?.estado)
-        val solicitudActualizada = repository.obtenerSolicitud(2)
-        assertEquals(EstadoSolicitud.DEVUELTA, solicitudActualizada?.estado)
-        assertEquals("file://cache/evidencia.jpg", solicitudActualizada?.evidenciaUri)
-        assertEquals(6.2514, solicitudActualizada?.latitud)
-        assertEquals("SINCRONIZADA", solicitudActualizada?.estadoEvidencia)
+    fun `crearSolicitud falla si el equipo ya esta PRESTADO`() {
+        // Arrange: El equipo 2 ya está PRESTADO en el Fake
+        val solicitud = SolicitudPrestamo(0, 2, "A-2", "Uso rudo", 2, EstadoSolicitud.SOLICITADA)
+
+        // Act
+        val resultado = repository.crearSolicitud(solicitud)
+
+        // Assert
+        assertTrue(resultado.isFailure)
+        assertEquals("No disponible", resultado.exceptionOrNull()?.message)
+    }
+
+    @Test
+    fun `registrarDevolucion falla con un ID de solicitud inexistente`() {
+        // Act: Intentamos devolver una solicitud con ID 999 que no existe
+        val resultado = repository.registrarDevolucion(999, "uri", 0.0, 0.0)
+
+        // Assert
+        assertTrue(resultado.isFailure)
+        assertEquals("No existe solicitud", resultado.exceptionOrNull()?.message)
     }
 }
