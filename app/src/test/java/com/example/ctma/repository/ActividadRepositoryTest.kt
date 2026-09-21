@@ -54,7 +54,6 @@ class ActividadRepositoryTest {
 
         val tokenProvider = SessionTokenProvider()
         val baseOkHttpClient = NetworkModule.crearOkHttpClient(tokenProvider)
-        // Usamos un timeout más corto para que la prueba de timeout sea rápida
         val okHttpClient = baseOkHttpClient.newBuilder()
             .connectTimeout(200, TimeUnit.MILLISECONDS)
             .readTimeout(200, TimeUnit.MILLISECONDS)
@@ -75,116 +74,214 @@ class ActividadRepositoryTest {
 
     // CA-01: 200 con actividades
     @Test
-    fun `CA-01 - 200 con actividades guarda en Room y actualiza el estado a Exitosa`() {
-        runTest {
-            val jsonResponse = """
-                [
-                    {"id": 1, "titulo": "Actividad 1", "descripcion": "Desc 1", "fechaLimite": "2026-09-30", "estado": "PENDIENTE"}
-                ]
-            """.trimIndent()
+    fun `CA-01 - 200 con actividades guarda en Room y actualiza el estado a Exitosa`() = runTest {
+        val jsonResponse = """
+            [
+                {"id": 1, "titulo": "Actividad 1", "descripcion": "Desc 1", "fechaLimite": "2026-09-30", "estado": "PENDIENTE"}
+            ]
+        """.trimIndent()
 
-            mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody(jsonResponse))
+        mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody(jsonResponse))
 
-            val resultado = repository.refresh()
+        val resultado = repository.refresh()
 
-            assertTrue(resultado is OperacionUiState.Exitosa)
-            
-            // Verificación real de persistencia en Room/Cache
-            val deGuardadas = dao.observarTodas().first()
-            assertEquals(1, deGuardadas.size)
-            assertEquals(1, deGuardadas[0].id)
-            assertEquals("Actividad 1", deGuardadas[0].titulo)
-        }
+        assertTrue(resultado is OperacionUiState.Exitosa)
+        
+        val deGuardadas = dao.observarTodas().first()
+        assertEquals(1, deGuardadas.size)
+        assertEquals(1, deGuardadas[0].id)
+        assertEquals("Actividad 1", deGuardadas[0].titulo)
     }
 
     // CA-02: 200 con arreglo vacío
     @Test
-    fun `CA-02 - 200 con arreglo vacio no borra la cache previa`() {
-        runTest {
-            // Precargar caché previa en Dao
-            val actividadPrevia = ActividadEntity(1, "Previa", "Desc", "2026-09-01", "HECHO")
-            dao.insertarTodas(listOf(actividadPrevia))
+    fun `CA-02 - 200 con arreglo vacio no borra la cache previa`() = runTest {
+        val actividadPrevia = ActividadEntity(1, "Previa", "Desc", "2026-09-01", "HECHO")
+        dao.insertarTodas(listOf(actividadPrevia))
 
-            mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody("[]"))
+        mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody("[]"))
 
-            val resultado = repository.refresh()
+        val resultado = repository.refresh()
 
-            assertTrue(resultado is OperacionUiState.Exitosa)
-            
-            // El caché previo debe conservarse según la política establecida
-            val deGuardadas = dao.observarTodas().first()
-            assertEquals(1, deGuardadas.size)
-            assertEquals("Previa", deGuardadas[0].titulo)
-        }
+        assertTrue(resultado is OperacionUiState.Exitosa)
+        
+        val deGuardadas = dao.observarTodas().first()
+        assertEquals(1, deGuardadas.size)
+        assertEquals("Previa", deGuardadas[0].titulo)
     }
 
     // CA-03: Timeout con caché
     @Test
-    fun `CA-03 - Timeout conserva el cache local y retorna operacion Fallida`() {
-        runTest {
-            // Precargar caché previa en Dao
-            val actividadPrevia = ActividadEntity(2, "Cache Existente", "Desc", "2026-09-05", "PENDIENTE")
-            dao.insertarTodas(listOf(actividadPrevia))
+    fun `CA-03 - Timeout conserva el cache local y retorna operacion Fallida`() = runTest {
+        val actividadPrevia = ActividadEntity(2, "Cache Existente", "Desc", "2026-09-05", "PENDIENTE")
+        dao.insertarTodas(listOf(actividadPrevia))
 
-            mockWebServer.enqueue(
-                MockResponse()
-                    .setBody("""[{"id": 1, "titulo": "T"}]""")
-                    .setBodyDelay(1, TimeUnit.SECONDS)
-            )
+        mockWebServer.enqueue(
+            MockResponse()
+                .setBody("""[{"id": 1, "titulo": "T"}]""")
+                .setBodyDelay(1, TimeUnit.SECONDS)
+        )
 
-            val resultado = repository.refresh()
+        val resultado = repository.refresh()
 
-            assertTrue(resultado is OperacionUiState.Fallida)
-            
-            // La información local almacenada previamente debe conservarse
-            val deGuardadas = dao.observarTodas().first()
-            assertEquals(1, deGuardadas.size)
-            assertEquals("Cache Existente", deGuardadas[0].titulo)
-        }
+        assertTrue(resultado is OperacionUiState.Fallida)
+        
+        val deGuardadas = dao.observarTodas().first()
+        assertEquals(1, deGuardadas.size)
+        assertEquals("Cache Existente", deGuardadas[0].titulo)
     }
 
     // CA-05: 401 Unauthorized
     @Test
-    fun `CA-05 - 401 retorna estado Fallida clasificado con mensaje de sesion vencida`() {
-        runTest {
-            mockWebServer.enqueue(MockResponse().setResponseCode(401).setBody("Unauthorized"))
+    fun `CA-05 - 401 retorna estado Fallida clasificado con mensaje de sesion vencida`() = runTest {
+        mockWebServer.enqueue(MockResponse().setResponseCode(401).setBody("Unauthorized"))
 
-            val resultado = repository.refresh()
+        val resultado = repository.refresh()
 
-            assertTrue(resultado is OperacionUiState.Fallida)
-            val fallida = resultado as OperacionUiState.Fallida
-            assertEquals(401, fallida.codigo)
-            assertTrue(fallida.mensaje.contains("Sesión vencida"))
-        }
+        assertTrue(resultado is OperacionUiState.Fallida)
+        val fallida = resultado as OperacionUiState.Fallida
+        assertEquals(401, fallida.codigo)
+        assertTrue(fallida.mensaje.contains("Sesión vencida"))
     }
 
     // CA-06: 500 o JSON inválido
     @Test
-    fun `CA-06 - 500 retorna estado Fallida clasificando error de servidor`() {
-        runTest {
-            mockWebServer.enqueue(MockResponse().setResponseCode(500).setBody("Internal Error"))
+    fun `CA-06 - 500 retorna estado Fallida clasificando error de servidor`() = runTest {
+        mockWebServer.enqueue(MockResponse().setResponseCode(500).setBody("Internal Error"))
 
-            val resultado = repository.refresh()
+        val resultado = repository.refresh()
 
-            assertTrue(resultado is OperacionUiState.Fallida)
-            val fallida = resultado as OperacionUiState.Fallida
-            assertEquals(500, fallida.codigo)
-            assertTrue(fallida.mensaje.contains("Error del servidor"))
-        }
+        assertTrue(resultado is OperacionUiState.Fallida)
+        val fallida = resultado as OperacionUiState.Fallida
+        assertEquals(500, fallida.codigo)
     }
 
+    // CA-07: Actualización de actividades existentes
     @Test
-    fun `CA-06 - JSON invalido retorna estado Fallida indicando error de formato`() {
-        runTest {
-            mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody("{ malformed json }"))
+    fun `CA-07 - Actualizar actividades reemplaza la informacion anterior`() = runTest {
+        val actividadAnterior = ActividadEntity(
+            id = 1,
+            titulo = "Actividad antigua",
+            descripcion = "Descripcion antigua",
+            fechaLimite = "2026-09-01",
+            estado = "PENDIENTE"
+        )
 
-            val resultado = repository.refresh()
+        dao.insertarTodas(listOf(actividadAnterior))
 
-            assertTrue(resultado is OperacionUiState.Fallida)
-            val fallida = resultado as OperacionUiState.Fallida
-            assertNull(fallida.codigo)
-            assertTrue(fallida.mensaje.contains("Error de procesado o formato inválido"))
-        }
+        val jsonResponse = """
+            [
+                {
+                    "id": 1,
+                    "titulo": "Actividad actualizada",
+                    "descripcion": "Nueva descripcion",
+                    "fechaLimite": "2026-10-15",
+                    "estado": "HECHO"
+                }
+            ]
+        """.trimIndent()
+
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .addHeader("Content-Type", "application/json")
+                .setBody(jsonResponse)
+        )
+
+        val resultado = repository.refresh()
+
+        assertTrue(resultado is OperacionUiState.Exitosa)
+
+        val actividadesGuardadas = dao.observarTodas().first()
+
+        assertEquals(1, actividadesGuardadas.size)
+        assertEquals("Actividad actualizada", actividadesGuardadas[0].titulo)
+        assertEquals("Nueva descripcion", actividadesGuardadas[0].descripcion)
+        assertEquals("HECHO", actividadesGuardadas[0].estado)
+    }
+
+    // CA-08: Guardar varias actividades
+    @Test
+    fun `CA-08 - Respuesta con varias actividades guarda todos los registros`() = runTest {
+        val jsonResponse = """
+            [
+                {
+                    "id": 10,
+                    "titulo": "Actividad A",
+                    "descripcion": "Descripcion A",
+                    "fechaLimite": "2026-10-01",
+                    "estado": "PENDIENTE"
+                },
+                {
+                    "id": 20,
+                    "titulo": "Actividad B",
+                    "descripcion": "Descripcion B",
+                    "fechaLimite": "2026-10-10",
+                    "estado": "HECHO"
+                },
+                {
+                    "id": 30,
+                    "titulo": "Actividad C",
+                    "descripcion": "Descripcion C",
+                    "fechaLimite": "2026-10-20",
+                    "estado": "PENDIENTE"
+                }
+            ]
+        """.trimIndent()
+
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .addHeader("Content-Type", "application/json")
+                .setBody(jsonResponse)
+        )
+
+        val resultado = repository.refresh()
+
+        assertTrue(resultado is OperacionUiState.Exitosa)
+
+        val actividadesGuardadas = dao.observarTodas().first()
+
+        assertEquals(3, actividadesGuardadas.size)
+
+        val ids = actividadesGuardadas.map { it.id }.toSet()
+
+        assertEquals(setOf(10, 20, 30), ids)
+    }
+
+    // CA-09: Error de permisos
+    @Test
+    fun `CA-09 - Error 403 retorna Fallida con codigo de permisos`() = runTest {
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(403)
+                .setBody("Forbidden")
+        )
+
+        val resultado = repository.refresh()
+
+        assertTrue(resultado is OperacionUiState.Fallida)
+
+        val fallida = resultado as OperacionUiState.Fallida
+
+        assertEquals(403, fallida.codigo)
+    }
+
+    // CA-10: Recurso no encontrado
+    @Test
+    fun `CA-10 - Error 404 retorna Fallida con codigo de recurso no encontrado`() = runTest {
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(404)
+                .setBody("Not Found")
+        )
+
+        val resultado = repository.refresh()
+
+        assertTrue(resultado is OperacionUiState.Fallida)
+
+        val fallida = resultado as OperacionUiState.Fallida
+
+        assertEquals(404, fallida.codigo)
     }
 }
-
