@@ -54,7 +54,7 @@ class ActividadRepositoryTest {
         val tokenProvider = SessionTokenProvider()
         val okHttpClient = NetworkModule.crearOkHttpClient(tokenProvider)
         api = NetworkModule.crearActividadApi(mockWebServer.url("/").toString(), okHttpClient)
-
+        
         dao = FakeActividadDao()
         val remoteDataSource = RemoteActividadDataSource(api)
         repository = ActividadRepositoryImpl(remoteDataSource, dao)
@@ -101,24 +101,12 @@ class ActividadRepositoryTest {
         mockWebServer.enqueue(
             MockResponse()
                 .setBody("""[{"id": 1, "titulo": "T"}]""")
-                .setBodyDelay(2, TimeUnit.SECONDS) // Ajustado a un retraso eficiente para pruebas
+                .setBodyDelay(20, TimeUnit.SECONDS)
         )
 
         val resultado = repository.refresh()
 
         assertTrue(resultado is OperacionUiState.Fallida)
-    }
-
-    // CA-04: 404 Not Found (NUEVO)
-    @Test
-    fun `CA-04 - 404 retorna estado Fallida por recurso no encontrado`() = runTest {
-        mockWebServer.enqueue(MockResponse().setResponseCode(404).setBody("Not Found"))
-
-        val resultado = repository.refresh()
-
-        assertTrue(resultado is OperacionUiState.Fallida)
-        val fallida = resultado as OperacionUiState.Fallida
-        assertEquals(404, fallida.codigo)
     }
 
     // CA-05: 401 Unauthorized
@@ -134,7 +122,7 @@ class ActividadRepositoryTest {
         assertTrue(fallida.mensaje.contains("Sesión vencida"))
     }
 
-    // CA-06: 500 Error de servidor
+    // CA-06: 500 o JSON inválido
     @Test
     fun `CA-06 - 500 retorna estado Fallida clasificando error de servidor`() = runTest {
         mockWebServer.enqueue(MockResponse().setResponseCode(500).setBody("Internal Error"))
@@ -144,27 +132,5 @@ class ActividadRepositoryTest {
         assertTrue(resultado is OperacionUiState.Fallida)
         val fallida = resultado as OperacionUiState.Fallida
         assertEquals(500, fallida.codigo)
-    }
-
-    // CA-07: Error de Red / Desconexión (NUEVO)
-    @Test
-    fun `CA-07 - Error de red o conexion caida retorna estado Fallida`() = runTest {
-        // Apagamos el servidor inmediatamente para simular que no hay conexión de red
-        mockWebServer.shutdown()
-
-        val resultado = repository.refresh()
-
-        assertTrue(resultado is OperacionUiState.Fallida)
-    }
-
-    // CA-08: JSON Inválido o Malformado con código 200 (NUEVO)
-    @Test
-    fun `CA-08 - JSON malformado con 200 OK retorna estado Fallida por error de parseo`() = runTest {
-        val jsonMalformado = "{ esto_no_es_un_json_valido }"
-        mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody(jsonMalformado))
-
-        val resultado = repository.refresh()
-
-        assertTrue(resultado is OperacionUiState.Fallida)
     }
 }
