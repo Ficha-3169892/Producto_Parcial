@@ -23,7 +23,7 @@ class PrestamoRepositoryTest {
         }
         override fun obtenerSolicitudes(): List<SolicitudPrestamo> = emptyList()
         override fun obtenerSolicitud(id: Int): SolicitudPrestamo? = solicitudSimulada
-        
+
         override fun crearSolicitud(solicitud: SolicitudPrestamo): Result<Unit> {
             equipoEstadoSimulado = EstadoEquipo.PRESTADO
             return Result.success(Unit)
