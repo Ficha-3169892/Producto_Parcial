@@ -50,19 +50,15 @@ class PrestamoViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun crearSolicitud(solicitud: SolicitudPrestamo): Result<Unit> {
-        viewModelScope.launch {
-            repository.crearSolicitudAsync(solicitud)
-            actualizarEstado()
-        }
-        return Result.success(Unit)
+        val resultado = repository.crearSolicitud(solicitud)
+        actualizarEstado()
+        return resultado
     }
 
     fun cancelarSolicitud(id: Int): Result<Unit> {
-        viewModelScope.launch {
-            repository.cancelarSolicitudAsync(id)
-            actualizarEstado()
-        }
-        return Result.success(Unit)
+        val resultado = repository.cancelarSolicitud(id)
+        actualizarEstado()
+        return resultado
     }
 
     fun registrarDevolucion(
@@ -72,14 +68,12 @@ class PrestamoViewModel(application: Application) : AndroidViewModel(application
         latitud: Double?,
         longitud: Double?
     ): Result<Unit> {
-        viewModelScope.launch {
-            val resultado = repository.registrarDevolucionAsync(id, evidenciaUri, latitud, longitud)
-            actualizarEstado()
-            if (resultado.isSuccess) {
-                mostrarNotificacionContextual(context, id)
-            }
+        val resultado = repository.registrarDevolucion(id, evidenciaUri, latitud, longitud)
+        actualizarEstado()
+        if (resultado.isSuccess) {
+            mostrarNotificacionContextual(context, id)
         }
-        return Result.success(Unit)
+        return resultado
     }
 
     @android.annotation.SuppressLint("MissingPermission")

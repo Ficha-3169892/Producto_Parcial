@@ -8,6 +8,7 @@ import com.example.ctma.model.EstadoEquipo
 import com.example.ctma.model.EstadoSolicitud
 import com.example.ctma.model.SolicitudPrestamo
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
 class RoomPrestamoRepository(
@@ -119,12 +120,12 @@ class RoomPrestamoRepository(
         Result.success(Unit)
     }
 
-    // Sobreescrituras heredadas obligatorias (fines síncronos legados)
-    override fun obtenerEquipos(): List<Equipo> = emptyList()
-    override fun obtenerEquipo(id: Int): Equipo? = null
-    override fun obtenerSolicitudes(): List<SolicitudPrestamo> = emptyList()
-    override fun obtenerSolicitud(id: Int): SolicitudPrestamo? = null
-    override fun crearSolicitud(solicitud: SolicitudPrestamo): Result<Unit> = Result.success(Unit)
-    override fun cancelarSolicitud(id: Int): Result<Unit> = Result.success(Unit)
-    override fun registrarDevolucion(id: Int, evidenciaUri: String?, latitud: Double?, longitud: Double?): Result<Unit> = Result.success(Unit)
+    // Implementaciones de la interfaz asegurando sincronización con Room Database
+    override fun obtenerEquipos(): List<Equipo> = runBlocking { obtenerEquiposAsync() }
+    override fun obtenerEquipo(id: Int): Equipo? = runBlocking { obtenerEquipoAsync(id) }
+    override fun obtenerSolicitudes(): List<SolicitudPrestamo> = runBlocking { obtenerSolicitudesAsync() }
+    override fun obtenerSolicitud(id: Int): SolicitudPrestamo? = runBlocking { obtenerSolicitudAsync(id) }
+    override fun crearSolicitud(solicitud: SolicitudPrestamo): Result<Unit> = runBlocking { crearSolicitudAsync(solicitud) }
+    override fun cancelarSolicitud(id: Int): Result<Unit> = runBlocking { cancelarSolicitudAsync(id) }
+    override fun registrarDevolucion(id: Int, evidenciaUri: String?, latitud: Double?, longitud: Double?): Result<Unit> = runBlocking { registrarDevolucionAsync(id, evidenciaUri, latitud, longitud) }
 }
