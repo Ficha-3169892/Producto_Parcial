@@ -105,6 +105,18 @@ fun SolicitudesScreen(
                                 text = "Estado: ${solicitud.estado}"
                             )
 
+                            if (solicitud.longitud != null) {
+                                Text(
+                                    text = "Longitud: ${solicitud.longitud}"
+                                )
+                            }
+
+                            if (solicitud.evidenciaUri != null) {
+                                Text(
+                                    text = "Evidencia: ${solicitud.evidenciaUri}"
+                                )
+                            }
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
