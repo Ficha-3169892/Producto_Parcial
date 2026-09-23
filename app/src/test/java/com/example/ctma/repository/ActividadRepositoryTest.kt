@@ -271,8 +271,7 @@ class ActividadRepositoryTest {
     @Test
     fun `CA-10 - Error 404 retorna Fallida con codigo de recurso no encontrado`() = runTest {
         mockWebServer.enqueue(
-            MockResponse()
-                .setResponseCode(404)
+            MockResponse()                .setResponseCode(404)
                 .setBody("Not Found")
         )
 
