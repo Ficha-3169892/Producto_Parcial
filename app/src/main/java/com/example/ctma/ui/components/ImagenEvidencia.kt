@@ -3,13 +3,23 @@ package com.example.ctma.ui.components
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -35,15 +45,28 @@ fun ImagenEvidencia(
         withContext(Dispatchers.IO) {
             try {
                 val uri = Uri.parse(uriString)
+                val loadedBitmap = try {
+                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                        BitmapFactory.decodeStream(inputStream)
+                    } ?: run {
+                        if (uri.scheme == null || uri.scheme == "file") {
+                            val file = File(uri.path ?: uriString)
+                            if (file.exists()) {
+                                BitmapFactory.decodeFile(file.absolutePath)
+                            } else null
+                        } else null
+                    }
                 } catch (e: Exception) {
+                    e.printStackTrace()
+                    null
                 }
 
-                        if (loadedBitmap != null) {
-                            bitmap = loadedBitmap.asImageBitmap()
-                            errorCarga = false
-                        } else {
-                            errorCarga = true
-                        }
+                if (loadedBitmap != null) {
+                    bitmap = loadedBitmap.asImageBitmap()
+                    errorCarga = false
+                } else {
+                    errorCarga = true
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
                 errorCarga = true
@@ -55,7 +78,7 @@ fun ImagenEvidencia(
 
     Box(
         modifier = modifier
-            .fillMaxWidth()
+            .fillMaxWidth(),
         contentAlignment = Alignment.Center
     ) {
         when {
@@ -74,6 +97,7 @@ fun ImagenEvidencia(
                     modifier = Modifier.padding(16.dp)
                 ) {
                     Text(
+                        text = "Error al cargar la imagen",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
