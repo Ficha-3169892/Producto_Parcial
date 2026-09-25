@@ -1,103 +1,60 @@
 package com.example.ctma.ui.catalogo.solicitudes
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.ctma.model.SolicitudPrestamo
-import com.example.ctma.ui.components.ImagenEvidencia
 
 @Composable
 fun SolicitudDetalleScreen(
     solicitud: SolicitudPrestamo,
     onVolver: () -> Unit
 ) {
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState()),
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+
         Text(
-            text = "Detalle de Solicitud",
+            text = "Detalle de solicitud",
             style = MaterialTheme.typography.headlineMedium
         )
 
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "Solicitud #${solicitud.id}",
-                    style = MaterialTheme.typography.titleLarge
-                )
-                Text(text = "Equipo ID: ${solicitud.equipoId}")
-                Text(text = "Ambiente de Destino: ${solicitud.ambienteDestino}")
-                Text(text = "Propósito: ${solicitud.proposito}")
-                Text(text = "Duración: ${solicitud.duracionHoras} horas")
-                Text(text = "Estado: ${solicitud.estado}")
-            }
-        }
+        Text(
+            text = "Solicitud #${solicitud.id}",
+            style = MaterialTheme.typography.titleLarge
+        )
 
-        // Sección de Evidencia Fotográfica
-        if (!solicitud.evidenciaUri.isNullOrEmpty()) {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "📷 Evidencia Fotográfica",
-                        style = MaterialTheme.typography.titleMedium
-                    )
+        Text(
+            text = "Equipo ID: ${solicitud.equipoId}"
+        )
 
-                    ImagenEvidencia(
-                        uriString = solicitud.evidenciaUri,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+        Text(
+            text = "Ambiente de destino: ${solicitud.ambienteDestino}"
+        )
 
-                    if (!solicitud.estadoEvidencia.isNullOrEmpty()) {
-                        AssistChip(
-                            onClick = {},
-                            label = { Text("Sincronización: ${solicitud.estadoEvidencia}") }
-                        )
-                    }
-                }
-            }
-        }
+        Text(
+            text = "Propósito: ${solicitud.proposito}"
+        )
 
-        // Sección de Georreferenciación (GPS)
-        if (solicitud.latitud != null && solicitud.longitud != null) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text = "📍 Georreferenciación (GPS)",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = "Latitud: ${solicitud.latitud}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        text = "Longitud: ${solicitud.longitud}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-        }
+        Text(
+            text = "Duración: ${solicitud.duracionHoras} horas"
+        )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Estado: ${solicitud.estado}"
+        )
 
         Button(
             onClick = onVolver,

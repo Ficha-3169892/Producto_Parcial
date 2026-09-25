@@ -105,6 +105,22 @@ fun SolicitudesScreen(
                                 text = "Estado: ${solicitud.estado}"
                             )
 
+                            if (!solicitud.evidenciaUri.isNullOrEmpty()) {
+                                Text(
+                                    text = "📷 Evidencia fotográfica adjunta",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            if (solicitud.latitud != null && solicitud.longitud != null) {
+                                Text(
+                                    text = "📍 Ubicación: Lat ${solicitud.latitud}, Lon ${solicitud.longitud}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
