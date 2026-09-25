@@ -11,4 +11,5 @@ data class SolicitudPrestamo(
     val latitud: Double? = null,
     val longitud: Double? = null,
     val estadoEvidencia: String? = null
+
 )
